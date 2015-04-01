@@ -87,16 +87,25 @@ app.get(authorizationCodeCallback, function (req, res, next) {
       params.error_description = err.message;
     }
 
-    if (user) {
-      params.access_token = info.accessToken;
-      params.app_scoped_id = info.appScopedId;
-      params.granted_scopes = info.grantedScopes;
-      // NOTE refreshToken should *not* go to the browser
+    if (!user) {
+      res.redirect(req.url + querystring.stringify(params));
+      return;
     }
 
-    req.url += querystring.stringify(params);
+    req.login(user, function (err) {
+      if (err) {
+        params.error = err.message;
+        params.error_description = err.message;
+      } else {
+        // NOTE: refreshToken should *not* go to the browser
+        params.access_token = info.accessToken;
+        params.expires_at = info.expiresAt;
+        params.app_scoped_id = info.appScopedId;
+        params.granted_scopes = info.grantedScopes;
+      }
 
-    res.redirect(req.url);
+      res.redirect(req.url + querystring.stringify(params));
+    });
   })(req, res, next);
 });
 ```
