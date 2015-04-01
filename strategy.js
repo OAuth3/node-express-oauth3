@@ -4,7 +4,6 @@
  * Module dependencies.
  */
 var passport = require('passport-strategy');
-var path = require('path');
 var util = require('util');
 var OAuth2Strategy = require('passport-oauth2');
 
@@ -275,7 +274,8 @@ function OAuth3Strategy(options, verify) {
       '', options.authorizationURL, options.tokenURL, options.customHeaders);
   */
 
-  me._callbackURL = options.callbackURL || options.callbackUrl;
+  me._accessTokenCallbackUrl = options.accessTokenCallbackUrl || options.callbackUrl || options.callbackURL;
+  me._authorizationCodeCallbackUrl = options.authorizationCodeCallbackUrl || options.callbackUrl || options.callbackURL;
   me._scope = options.scope;
   me._scopeSeparator = options.scopeSeparator || ' ';
   me._state = (false === options.state ? false : true);
@@ -342,6 +342,8 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
   oauth2.getOAuthAccessToken(code, params, function(err, accessToken, refreshToken, params) {
     if (err) {
       console.error('OAuth3 Error 1');
+      console.log('Error hint: Double check that App Id and App Secret are correct');
+      console.log('Error hint: Is code is correct?', code);
       console.log(err);
       self.error(self._createOAuthError('Failed to obtain access token', err));
       return;
@@ -472,7 +474,7 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
     var url = require('url');
     var AuthorizationError = require('passport-oauth2/lib/errors/authorizationerror');
     var utils = require('passport-oauth2/lib/utils');
-    var callbackURL;
+    var callbackUrl;
     var parsed;
     var scope;
     var key;
@@ -487,34 +489,35 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
       }
     }
     
-    // TODO distinguish between authorizationCodeCallback and accessTokenCallback
-    callbackURL = (options.callbackURL || self._callbackURL);
-    if (callbackURL) {
-      parsed = url.parse(callbackURL);
-      if (!parsed.protocol) {
-        // The callback URL is relative, resolve a fully qualified URL from the
-        // URL of the originating request.
-        callbackURL = url.resolve(utils.originalURL(req, { proxy: self._trustProxy }), callbackURL);
-      }
-    }
-    callbackURL += '?provider_uri=' + encodeURIComponent(providerUri);
     // TODO Hmm... make sure this still works when sessions are JWT rather than cookies
     // (it should because the session will be in the express)
     // TODO also, this probably isn't unique enough. probably needs a random state param
-    key = (
-      'oauth3:' 
-    + url.parse(directive.authorization_dialog.url).hostname
-    + providerUri
-    );
+    key = 'oauth3:' + url.parse(directive.authorization_dialog.url).hostname + providerUri;
     
     if (!req.query.code) {
       // TODO access_token_uri must be documented
       // This is done in getOauthClient above, but maybe should be done here
       // oauth2._accessTokenUrl = req.query.access_token_uri || req.query.token_uri || oauth2._accessTokenUrl;
+      callbackUrl = options.accessTokenCallbackUrl || self._accessTokenCallbackUrl;
+      parsed = url.parse(callbackUrl);
+      if (!parsed.protocol) {
+        // The callback URL is relative, resolve a fully qualified URL from the
+        // URL of the originating request.
+        callbackUrl = url.resolve(utils.originalURL(req, { proxy: self._trustProxy }), callbackUrl);
+      }
+      callbackUrl += '?provider_uri=' + encodeURIComponent(providerUri);
       scope = req.query.scope || options.scope || self._scope || directive.authn_scope;
-      redirectToAuthorizationDialog(self, req, key, oauth2, callbackURL, scope, options);
+      redirectToAuthorizationDialog(self, req, key, oauth2, callbackUrl, scope, options);
     } else {
-      exchangeCodeForToken(self, req, key, oauth2, callbackURL, providerUri, options);
+      callbackUrl = options.authorizationCodeCallbackUrl || self._authorizationCodeCallbackUrl;
+      parsed = url.parse(callbackUrl);
+      if (!parsed.protocol) {
+        // The callback URL is relative, resolve a fully qualified URL from the
+        // URL of the originating request.
+        callbackUrl = url.resolve(utils.originalURL(req, { proxy: self._trustProxy }), callbackUrl);
+      }
+      callbackUrl += '?provider_uri=' + encodeURIComponent(providerUri);
+      exchangeCodeForToken(self, req, key, oauth2, callbackUrl, providerUri, options);
     }
   });
 };

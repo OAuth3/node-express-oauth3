@@ -4,14 +4,15 @@ passport-oauth3
 Node.js / ExpressJS / PassportJS Strategy for OAuth2 / OAuth3 providers
 
 
-OAuth3 is a 100% backwards compatible, more strict subset of OAuth2.
+OAuth3 (aka OAuthn) is a 100% backwards compatible, more strict subset of OAuth2.
 It easier to implement, test, debug.
 It also has the advantages of being federated, delegated, cacheable, and more private.
 
-Unlike OAuth2, OAuth3 (aka OAuthN) does not require any knowledge of the
-implementation details of either party.
+Unlike OAuth2, OAuth3 does not require any knowledge of the implementation details
+of either party.
 
-Also, OAuth3 may use JavaScript to perform many client-side functions, including issuing tokens.
+Also, OAuth3 may use JavaScript to perform many client-side functions,
+including issuing tokens.
 
 Example
 =======
@@ -78,7 +79,7 @@ function setRegistrationValues(providerUri, registration) {
   // registration is not yet implemented
   var key = stripLeadingProtocolAndTrailingSlash(providerUri);
 
-  providerConfig[key] = conf;
+  providerConfig[key] = registration;
 
   return PromiseA.resolve();
 }
@@ -96,7 +97,8 @@ function getUserFromToken(req, providerUri, info, params) {
 passport.use('oauth3-strategy-1', new OAuth3Strategy({
   providerCallback: getRegistrationValues 
 , registrationCallback: setRegistrationValues
-, callbackURL: "https://my-awesome-consumer.com" + authorizationCodeCallback 
+, authorizationCodeCallbackUrl: "https://my-awesome-consumer.com" + authorizationCodeCallback 
+, accessTokenCallbackUrl: "https://my-awesome-consumer.com" + authorizationCodeCallback 
 }
 , getUserFromToken
 ));
@@ -122,11 +124,12 @@ function handleOauth3Response(req, res, next, err, user, info, status) {
   }
 
   if (!user) {
+    challenge = info; // info is overloaded as challenge on error
     return PromiseA.reject(params);
   }
 
   return new PromiseA(function (resolve, reject) {
-    req.login(user, function (err) {
+    req.login({ profile: user, info: info }, function (err) {
       if (err) {
         params.error = err.message;
         params.error_description = err.message;
@@ -147,14 +150,15 @@ function handleOauth3Response(req, res, next, err, user, info, status) {
 
 app.get(accessTokenCallback, function (req, res, next) {
   passport.authenticate('oauth3-strategy-1', function (err, user, info, status) {
+    var querystring = require('querystring');
+
     handleOauth3Response(req, res, next, err, user, info, status).then(function (params) {
-      var querystring = require('querystring');
       res.redirect('/oauth-close.html?' + querystring.stringify(params));
     }, function (err) {
       var params;
       if (err.error_description) {
         params = err;
-        res.redirect('/oauth-close.html?' + querystring.stringify(errparams));
+        res.redirect('/oauth-close.html?' + querystring.stringify(params));
       } else {
         res.end("Error: " + err.message);
       }
