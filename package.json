@@ -1,0 +1,40 @@
+{
+  "name": "passport-oauth3",
+  "version": "1.0.0",
+  "description": "Node.js / ExpressJS / PassportJS Strategy for OAuth2 / OAuth3 providers",
+  "main": "strategy.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/OAuth3/passport-oauth3.git"
+  },
+  "keywords": [
+    "OAuth3",
+    "OAuth2",
+    "OAuth",
+    "OAuthN",
+    "AuthN",
+    "auth",
+    "passport"
+  ],
+  "author": {
+    "name": "AJ ONeal",
+    "email": "coolaj86@gmail.com",
+    "url": "https://coolaj86.com/"
+  },
+  "license": "Commercial",
+  "bugs": {
+    "url": "https://github.com/OAuth3/passport-oauth3/issues"
+  },
+  "homepage": "https://github.com/OAuth3/passport-oauth3",
+  "dependencies": {
+    "bluebird": "^2.9.21",
+    "oauth": "^0.9.12",
+    "passport-oauth": "~1.0.0",
+    "passport-strategy": "^1.0.0",
+    "request": "^2.44.0",
+    "uid2": "0.0.3"
+  }
+}
