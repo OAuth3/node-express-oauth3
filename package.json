@@ -33,6 +33,7 @@
     "bluebird": "^2.9.21",
     "oauth": "^0.9.12",
     "passport-oauth": "~1.0.0",
+    "passport-oauth2": "^1.1.2",
     "passport-strategy": "^1.0.0",
     "request": "^2.44.0",
     "uid2": "0.0.3"
