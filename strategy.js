@@ -467,6 +467,15 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
   var self = this;
   var providerUri = req.query.provider_uri;
 
+  if (!providerUri) {
+    if (req.params) {
+      providerUri = decodeURIComponent(req.params.providerUri);
+    }
+  }
+  if (!/^(https?|spdy):\/\//.test(providerUri)) {
+    providerUri = 'https://' + providerUri;
+  }
+
   return getOauthClient(self, req, providerUri).then(function (info) {
     options = options || {};
     var oauth2 = info.oauth2;
