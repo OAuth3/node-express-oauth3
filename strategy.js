@@ -305,7 +305,7 @@ util.inherits(OAuth3Strategy, OAuth2Strategy);
 
 function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerUri, options) {
   var code = req.query.code;
-  var state;
+  var metaState;
   var params;
 
   if (!req.session) {
@@ -318,8 +318,8 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
     return;
   }
 
-  state = req.session[key].state;
-  if ('object' !== typeof state) {
+  metaState = req.session[key].state;
+  if ('object' !== typeof metaState) {
     self.fail({ message: 'Unable to verify authorization request state.' }, 403);
     return;
   }
@@ -329,7 +329,7 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
     delete req.session[key];
   }
 
-  if (state.serverState !== req.query.state) {
+  if (metaState.serverState !== req.query.state) {
     self.fail({ message: 'Invalid authorization request state.' }, 403);
     return;
   }
@@ -368,8 +368,8 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
           , appScopedId: params.app_scoped_id
             // TODO options._scopeSeparator
           , grantedScopes: (params.granted_scopes||'').split(/[,\s]/g)
-          , browserState: state.browserState
-          , state: state.browserState
+          , browserState: metaState.browserState
+          , state: metaState.browserState
           }
         , params
         );
