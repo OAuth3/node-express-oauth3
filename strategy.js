@@ -8,6 +8,7 @@ var util = require('util');
 var OAuth2Strategy = require('passport-oauth2');
 
 var PromiseA = require('bluebird').Promise;
+var allStates = {};
 
 function lintUrl(name, uri) {
   var url;
@@ -303,8 +304,9 @@ function OAuth3Strategy(options, verify) {
  */
 util.inherits(OAuth3Strategy, OAuth2Strategy);
 
-function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerUri, options) {
+function exchangeCodeForToken(self, req, oauth2, fullCallbackUrl, providerUri, options) {
   var code = req.query.code;
+  var serverState = req.query.state;
   var metaState;
   var params;
 
@@ -313,21 +315,25 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
     return;
   }
   
-  if (!req.session[key]) {
+  if (!allStates[serverState]) {
     self.fail({ message: 'Unable to verify authorization request state.' }, 403);
     return;
   }
 
-  metaState = req.session[key].state;
+  metaState = allStates[serverState];
   if ('object' !== typeof metaState) {
     self.fail({ message: 'Unable to verify authorization request state.' }, 403);
     return;
   }
     
-  delete req.session[key].state;
-  if (Object.keys(req.session[key]).length === 0) {
-    delete req.session[key];
-  }
+  delete allStates[serverState];
+  // TODO do this better
+  // delete all states that are more than 15 minutes old
+  Object.keys(allStates).forEach(function (key) {
+    if (Date.now() - allStates[key].createdAt > (15 * 60 * 1000)) {
+      delete allStates[key];
+    }
+  });
 
   if (metaState.serverState !== req.query.state) {
     self.fail({ message: 'Invalid authorization request state.' }, 403);
@@ -398,7 +404,7 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
     });
   });
 }
-function redirectToAuthorizationDialog(self, req, key, oauth2, fullCallbackUrl, scope, options) {
+function redirectToAuthorizationDialog(self, req, oauth2, providerUri, fullCallbackUrl, scope, options) {
   options = options || {};
   var uid = require('uid2');
   var params;
@@ -420,12 +426,12 @@ function redirectToAuthorizationDialog(self, req, key, oauth2, fullCallbackUrl, 
     return;
   }
   
-  serverState = uid(24);
-  if (!req.session[key]) { req.session[key] = {}; }
-  req.session[key].state = {
+  serverState = uid(48);
+  allStates[serverState] = {
     browserState: browserState
   , serverState: serverState
-  , created_at: Date.now()
+  , createdAt: Date.now()
+  , providerUri: providerUri
   };
 
   params.state = serverState;
@@ -471,27 +477,37 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
 
   var self = this;
   var providerUri = req.query.provider_uri;
+  // Note: this could also be browser state, but for the purposes here, it would need to be the server state
+  var serverState = req.query.state;
+  var err;
 
   if (!providerUri) {
-    if (req.params) {
+    if (req.params && req.params.providerUri) {
       providerUri = decodeURIComponent(req.params.providerUri);
     }
+    else if (allStates[serverState] && allStates[serverState].providerUri) {
+      providerUri = allStates[serverState].providerUri;
+    } else {
+      err = new Error("provider_uri must be passed as a url param, a query param, or related to the state param");
+      err.code = "E_NO_PROVIDER_URI";
+      return PromiseA.reject(err);
+    }
   }
+
   if (!/^(https?|spdy):\/\//.test(providerUri)) {
     providerUri = 'https://' + providerUri;
   }
 
   return getOauthClient(self, req, providerUri).then(function (info) {
     options = options || {};
+    var url = require('url');
     var oauth2 = info.oauth2;
     var directive = info.directive;
-    var url = require('url');
     var AuthorizationError = require('passport-oauth2/lib/errors/authorizationerror');
     var utils = require('passport-oauth2/lib/utils');
     var callbackUrl;
     var parsed;
     var scope;
-    var key;
     
     if (req.query.error) {
       if (req.query.error === 'access_denied') {
@@ -506,7 +522,6 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
     // TODO Hmm... make sure this still works when sessions are JWT rather than cookies
     // (it should because the session will be in the express)
     // TODO also, this probably isn't unique enough. probably needs a random state param
-    key = 'oauth3:' + url.parse(directive.authorization_dialog.url).hostname + providerUri;
     
     if (!req.query.code) {
       // TODO access_token_uri must be documented
@@ -519,9 +534,8 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
         // URL of the originating request.
         callbackUrl = url.resolve(utils.originalURL(req, { proxy: self._trustProxy }), callbackUrl);
       }
-      callbackUrl += '?provider_uri=' + encodeURIComponent(providerUri);
       scope = req.query.scope || options.scope || self._scope || directive.authn_scope;
-      redirectToAuthorizationDialog(self, req, key, oauth2, callbackUrl, scope, options);
+      redirectToAuthorizationDialog(self, req, oauth2, providerUri, callbackUrl, scope, options);
     } else {
       callbackUrl = options.authorizationCodeCallbackUrl || self._authorizationCodeCallbackUrl;
       parsed = url.parse(callbackUrl);
@@ -530,8 +544,7 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
         // URL of the originating request.
         callbackUrl = url.resolve(utils.originalURL(req, { proxy: self._trustProxy }), callbackUrl);
       }
-      callbackUrl += '?provider_uri=' + encodeURIComponent(providerUri);
-      exchangeCodeForToken(self, req, key, oauth2, callbackUrl, providerUri, options);
+      exchangeCodeForToken(self, req, oauth2, callbackUrl, providerUri, options);
     }
   });
 };
