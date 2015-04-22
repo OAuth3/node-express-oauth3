@@ -278,7 +278,8 @@ function OAuth3Strategy(options, verify) {
   me._authorizationCodeCallbackUrl = options.authorizationCodeCallbackUrl || options.callbackUrl || options.callbackURL;
   me._scope = options.scope;
   me._scopeSeparator = options.scopeSeparator || ' ';
-  me._state = (false === options.state ? false : true);
+  // in OAuth3 this is non-optional
+  me._state = true; //(false === options.state ? false : true);
   me._trustProxy = options.proxy;
   if ('function' !== typeof options.providerCallback) {
     throw new Error("Implement 'options.providerCallback' as 'function (providerUri) { return Promise.resolve({ id: 'id', secret: 'secret' }); }");
@@ -307,32 +308,30 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
   var state;
   var params;
 
-  if (self._state) {
-    if (!req.session) {
-      self.error(new Error('OAuth2Strategy requires session support when using state. Did you forget app.use(express.session(...))?'));
-      return;
-    }
-    
-    if (!req.session[key]) {
-      self.fail({ message: 'Unable to verify authorization request state.' }, 403);
-      return;
-    }
+  if (!req.session) {
+    self.error(new Error('OAuth2Strategy requires session support when using state. Did you forget app.use(express.session(...))?'));
+    return;
+  }
+  
+  if (!req.session[key]) {
+    self.fail({ message: 'Unable to verify authorization request state.' }, 403);
+    return;
+  }
 
-    state = req.session[key].state;
-    if (!state) {
-      self.fail({ message: 'Unable to verify authorization request state.' }, 403);
-      return;
-    }
+  state = req.session[key].state;
+  if ('object' !== typeof state) {
+    self.fail({ message: 'Unable to verify authorization request state.' }, 403);
+    return;
+  }
     
-    delete req.session[key].state;
-    if (Object.keys(req.session[key]).length === 0) {
-      delete req.session[key];
-    }
-    
-    if (state !== req.query.state) {
-      self.fail({ message: 'Invalid authorization request state.' }, 403);
-      return;
-    }
+  delete req.session[key].state;
+  if (Object.keys(req.session[key]).length === 0) {
+    delete req.session[key];
+  }
+
+  if (state.serverState !== req.query.state) {
+    self.fail({ message: 'Invalid authorization request state.' }, 403);
+    return;
   }
 
   params = self.tokenParams(options);
@@ -342,9 +341,9 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
   oauth2.getOAuthAccessToken(code, params, function(err, accessToken, refreshToken, params) {
     if (err) {
       console.error('OAuth3 Error 1');
-      console.log('Error hint: Double check that App Id and App Secret are correct');
-      console.log('Error hint: Is code is correct?', code);
-      console.log(err);
+      console.warn('Error hint: Double check that App Id and App Secret are correct');
+      console.warn('Error hint: Is code is correct?', code);
+      console.warn(err);
       self.error(self._createOAuthError('Failed to obtain access token', err));
       return;
     }
@@ -354,7 +353,7 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
 
       if (err) {
         console.error('OAuth3 Error 2');
-        console.log(err);
+        console.warn(err);
         self.error(err);
         return;
       }
@@ -369,12 +368,14 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
           , appScopedId: params.app_scoped_id
             // TODO options._scopeSeparator
           , grantedScopes: (params.granted_scopes||'').split(/[,\s]/g)
+          , browserState: state.browserState
+          , state: state.browserState
           }
         , params
         );
       } catch(e) {
         console.error('OAuth3 Error 3');
-        console.log(e);
+        console.warn(e);
         self.error(e);
         return;
       }
@@ -383,7 +384,7 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
       promise.then(function (result) {
         if (!result || !result.user) {
           console.error('OAuth3 Error 4');
-          console.log(result);
+          console.warn(result);
           self.fail(result && result.info || { error: { message: "no user could be fetched" } });
           return;
         }
@@ -391,16 +392,18 @@ function exchangeCodeForToken(self, req, key, oauth2, fullCallbackUrl, providerU
         self.success(result.user, result.info);
       }).catch(function (e) {
         console.error('OAuth3 Error 5');
-        console.log(e);
+        console.warn(e);
         self.error(e);
       });
     });
   });
 }
 function redirectToAuthorizationDialog(self, req, key, oauth2, fullCallbackUrl, scope, options) {
+  options = options || {};
   var uid = require('uid2');
   var params;
-  var state;
+  var browserState;
+  var serverState;
   var redirectUrl;
 
   params = self.authorizationParams(options);
@@ -410,20 +413,22 @@ function redirectToAuthorizationDialog(self, req, key, oauth2, fullCallbackUrl, 
     if (Array.isArray(scope)) { scope = scope.join(self._scopeSeparator); }
     params.scope = scope;
   }
-  state = options.state;
-  if (state) {
-    params.state = state;
-  } else if (self._state) {
-    if (!req.session) {
-      self.error(new Error('OAuth2Strategy requires session support when using state. Did you forget app.use(express.session(...))?'));
-      return;
-    }
-    
-    state = uid(24);
-    if (!req.session[key]) { req.session[key] = {}; }
-    req.session[key].state = state;
-    params.state = state;
+  browserState = params.state || req.query.browser_state || req.query.state;
+
+  if (!req.session) {
+    self.error(new Error('OAuth2Strategy requires session support when using state. Did you forget app.use(express.session(...))?'));
+    return;
   }
+  
+  serverState = uid(24);
+  if (!req.session[key]) { req.session[key] = {}; }
+  req.session[key].state = {
+    browserState: browserState
+  , serverState: serverState
+  , created_at: Date.now()
+  };
+
+  params.state = serverState;
   
   redirectUrl = oauth2.getAuthorizeUrl(params);
   self.redirect(redirectUrl);
