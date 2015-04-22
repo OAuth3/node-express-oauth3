@@ -1,6 +1,6 @@
 {
   "name": "passport-oauth3",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Node.js / ExpressJS / PassportJS Strategy for OAuth2 / OAuth3 providers",
   "main": "strategy.js",
   "scripts": {
