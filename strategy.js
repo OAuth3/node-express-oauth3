@@ -3,9 +3,8 @@
 /**
  * Module dependencies.
  */
-var passport = require('passport-strategy');
 var util = require('util');
-var OAuth2Strategy = require('passport-oauth2');
+var OAuth2Strategy = require('./passport-oauth2');
 
 var PromiseA = require('bluebird').Promise;
 var allStates = {};
@@ -250,8 +249,6 @@ function OAuth3Strategy(options, verify) {
   if ('function' !== typeof verify) {
     throw new TypeError('OAuth3Strategy requires an options parameter and a verify callback');
   }
-
-  passport.Strategy.call(this);
 
   me.name = 'oauth3';
   me._verify = verify;
@@ -503,8 +500,8 @@ OAuth3Strategy.prototype.authenticate = function(req, options) {
     var url = require('url');
     var oauth2 = info.oauth2;
     var directive = info.directive;
-    var AuthorizationError = require('passport-oauth2/lib/errors/authorizationerror');
-    var utils = require('passport-oauth2/lib/utils');
+    var AuthorizationError = require('./errors/authorizationerror');
+    var utils = require('./utils');
     var callbackUrl;
     var parsed;
     var scope;
@@ -595,7 +592,7 @@ OAuth3Strategy.prototype.userProfile = function (req, providerUri, accessToken, 
       directive.profile.url
     , accessToken
     , function (err, body/*, res*/) {
-        var InternalOAuthError = require('passport-oauth2/lib/errors/internaloautherror');
+        var InternalOAuthError = require('./errors/internaloautherror');
         if (err) { return done(new InternalOAuthError('failed to fetch user account list', err)); }
 
         conditionalParse(body, done);
