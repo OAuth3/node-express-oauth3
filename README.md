@@ -64,7 +64,7 @@ function stripLeadingProtocolAndTrailingSlash(uri) {
 function getRegistrationOptions(providerUri) {
   return {
     allowed_domains: [ "https://awesome.com", "https://partner-site.com" ]
-  , allowed_ips: [ "10.0.0.0/24", "10.100.100.100" ]
+  , allowed_cnames: [ "internal.example.com", "external.example.com" ]
   , allowed_redirects: [ "https://awesome.com/oauth3.html", "https://api.awesome.com/oauth3/" ]
   };
 }
@@ -119,8 +119,9 @@ function handleOauth3Response(req, res, next, err, user, info, status) {
   var challenge;
 
   if (err) {
-    params.error = err.message;
+    params.error = err.code;
     params.error_description = err.message;
+    params.error_uri = "https://example.com/docs/errors#" + err.code
   }
 
   if (!user) {
