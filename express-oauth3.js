@@ -9,9 +9,11 @@ var Oauth3 = module.exports = {
 
     options.oauth3Prefix = options.oauth3Prefix || '/api/oauth3';
     options.authorizationRedirect = options.authorizationRedirect || '/api/oauth3/authorization_redirect';
-    options.authorizationCodeCallback = options.authorizationCodeCallback || '/api/oauth3/authorization_redirect';
-    // TODO make dynamic by incoming hostname ?
-    options.authorizationCodeCallbackUrl = options.domain + options.authorizationCodeCallback;
+    options.authorizationCodeCallback = options.authorizationCodeCallback || '/api/oauth3/authorization_code_callback';
+
+    if (options.domain && !options.authorizationCodeCallbackUrl) {
+      options.authorizationCodeCallbackUrl = options.domain + options.authorizationCodeCallback;
+    }
 
     var consumer = options.consumer || Oauth3.Consumer.create(DirectiveStore, KeyValueStore, options);
     var routes = options.routes || Oauth3.Routes.create(Oauth3.Consumer, consumer, options);
