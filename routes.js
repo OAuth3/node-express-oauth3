@@ -1,6 +1,6 @@
 'use strict';
 
-module.exports.create = function (app, OAuth3Strategy, oauth3, config) {
+module.exports.create = function (OAuth3Strategy, oauth3/*, options*/) {
   var querystring = require('querystring');
   var routes = {
     lint: function (req, res, next) {

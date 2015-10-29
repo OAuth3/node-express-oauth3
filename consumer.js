@@ -1,5 +1,7 @@
 'use strict';
 
+var Oauth3Consumer = module.exports = function () {};
+
 /**
  * Module dependencies.
  */
@@ -91,7 +93,7 @@ function realFetchDirective(self, providerUri) {
       json = JSON.parse(body);
     } catch(e) {
       // ignore
-      return PromiseA.reject(new Error("OAuth3 could not parse '" + encodeURI(uri) + "' as valid json"));
+      return PromiseA.reject(new Error("Oauth3 could not parse '" + encodeURI(uri) + "' as valid json"));
     }
 
     // TODO lint urls and everything
@@ -144,11 +146,15 @@ function realFetchDirective(self, providerUri) {
 
     return self._directives[providerUri].directive;
   }).error(function (err) {
-    return PromiseA.reject(new Error("OAuth3 could not retrieve '" + encodeURI(uri) + "': " + err.message));
+    return PromiseA.reject(new Error("Oauth3 could not retrieve '" + encodeURI(uri) + "': " + err.message));
   });
 }
 
-function fetchDirective(self, providerUri, providerConfig) {
+Oauth3Consumer.stripLeadingProtocolAndTrailingSlash = function (uri) {
+  return uri.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
+};
+
+Oauth3Consumer.directive = function (self, providerUri, providerConfig) {
   // TODO user-configured object with fetch callback
   if (providerConfig && providerConfig.directives) {
     return PromiseA.resolve(providerConfig.directives);
@@ -176,15 +182,15 @@ function fetchDirective(self, providerUri, providerConfig) {
   }
 
   return PromiseA.resolve(directive.directive);
-}
+};
 
-function getOauthClient(self, req, providerUri) {
-  return self._getOptions(providerUri).then(function (conf) {
-    return fetchDirective(self, providerUri, conf).then(function (directive) {
+Oauth3Consumer._getOauthClient = function (self, req, providerUri) {
+  return self._ds.getAsync(Oauth3Consumer.stripLeadingProtocolAndTrailingSlash(providerUri)).then(function (conf) {
+    return Oauth3Consumer.directive(self, providerUri, conf).then(function (directive) {
       // TODO automatic registration via directive.registration if conf.appId is missing
 
       var OAuth2 = require('oauth').OAuth2;
-      var baseSite = ''; // leave as empty string so that OAuth3 (requires absolute URLs) can create its own
+      var baseSite = ''; // leave as empty string so that Oauth3 (requires absolute URLs) can create its own
       var appId = conf.id
           || conf.appId || conf.appID
           || conf.consumerId || conf.consumerID
@@ -196,7 +202,7 @@ function getOauthClient(self, req, providerUri) {
         return PromiseA.reject("Automatic Registration not implemented yet. Cannot OAuth-orize '" + providerUri + "'");
       }
 
-      // TODO create instanceless OAuth3 module
+      // TODO create instanceless Oauth3 module
       var oauth2 = PromiseA.promisifyAll(new OAuth2(
         appId
       , appSecret
@@ -204,12 +210,12 @@ function getOauthClient(self, req, providerUri) {
       , directive.authorization_dialog.url
       , req.query.access_token_uri || req.query.token_uri || directive.access_token.url || conf.access_token
       , directive.http_headers
-      ));
+      ), { multiArgs: true });
 
       return { oauth2: oauth2, directive: directive };
     });
   });
-}
+};
 
 /**
  * `Strategy` constructor.
@@ -245,9 +251,8 @@ function getOauthClient(self, req, providerUri) {
  * @param {Object} KeyValueStore
  * @api public
  */
-function OAuth3Consumer() {
-}
-OAuth3Consumer.create = function (options, DirectiveStore, kvStore) {
+
+Oauth3Consumer.create = function (DirectiveStore, kvStore, options) {
   if ('string' !== typeof options.authorizationCodeCallback || !/^\/\w/.test(options.authorizationCodeCallback)) {
     throw new Error(
       'options.authorizationCodeCallback should be a string'
@@ -263,17 +268,17 @@ OAuth3Consumer.create = function (options, DirectiveStore, kvStore) {
     );
   }
 
-  if ('function' !== typeof DirectiveStore.providerCallback) {
-    throw new Error("Implement 'DS.providerCallback' as 'function (providerUri) { return Promise.resolve({ id: 'id', secret: 'secret' }); }");
+  if ('function' !== typeof DirectiveStore.getAsync) {
+    throw new Error("Implement 'DS.getAsync' as 'function (providerUri) { return Promise.resolve({ id: 'id', secret: 'secret' }); }");
   }
-  if (1 !== DirectiveStore.providerCallback.length) {
-    throw new Error("'DS.providerCallback' should only accept 1 parameter: providerUri");
+  if (1 !== DirectiveStore.getAsync.length) {
+    throw new Error("'DS.getAsync' should only accept 1 parameter: providerUri");
   }
-  if ('function' !== typeof DirectiveStore.registrationCallback) {
-    throw new Error("Implement 'DS.registrationCallback' as 'function (providerUri, conf) { return Promise.resolve(); }");
+  if ('function' !== typeof DirectiveStore.setAsync) {
+    throw new Error("Implement 'DS.setAsync' as 'function (providerUri, conf) { return Promise.resolve(); }");
   }
-  if (2 !== DirectiveStore.registrationCallback.length) {
-    throw new Error("'DS.providerCallback' should accept exactly 2 parameters: providerUri, config");
+  if (2 !== DirectiveStore.setAsync.length) {
+    throw new Error("'DS.setAsync' should accept exactly 2 parameters: providerUri, config");
   }
 
   var me = {};
@@ -281,15 +286,14 @@ OAuth3Consumer.create = function (options, DirectiveStore, kvStore) {
 
   me._authorizationCodeCallbackUrl = options.authorizationCodeCallbackUrl || options.callbackUrl || options.callbackURL;
   me._scopeSeparator = options.scopeSeparator || ' ';
-  // in OAuth3 this is non-optional
+  // in Oauth3 this is non-optional
   me._trustProxy = options.proxy;
 
-  me._getOptions = DirectiveStore.providerCallback;
-  me._setOptions = DirectiveStore.registrationCallback;
+  me._ds = DirectiveStore;
 
   me._kv = kvStore;
   if (!me._kv.getAsync) {
-    me._kv = PromiseA.promisifyAll(kvStore);
+    me._kv = PromiseA.promisifyAll(kvStore, { multiArgs: true });
   }
 
   // XXX TODO XXX this need use the KV store
@@ -431,26 +435,26 @@ function redirectToAuthorizationDialog(self, req, oauth2, providerUri, fullCallb
  *      }
  *    );
  */
-OAuth3Consumer.authenticate = function (strategy, req, options) {
+Oauth3Consumer.authenticate = function (strategy, req, options) {
   if (!req.query.code) {
-    return OAuth3Consumer.authorizationRedirect(strategy, req, options);
+    return Oauth3Consumer.authorizationRedirect(strategy, req, options);
   } else { 
     throw new Error("expected parameter 'code'");
   }
 };
 
-OAuth3Consumer.authorizationRedirect = function (strategy, req, options) {
+Oauth3Consumer.authorizationRedirect = function (strategy, req, options) {
   options = options || {};
   var self = strategy;
   var providerUri = req.query.provider_uri || (req.params.providerUri && decodeURIComponent(req.params.providerUri));
 
-  return OAuth3Consumer.authenticateHelper(strategy, req, providerUri, options).then(function (helpers) {
+  return Oauth3Consumer.authenticateHelper(strategy, req, providerUri, options).then(function (helpers) {
     var scope = req.query.scope || options.scope || helpers.directive.authn_scope;
     return redirectToAuthorizationDialog(self, req, helpers.oauth2, providerUri, helpers.callbackUrl, scope, helpers.directive);
   });
 };
 
-OAuth3Consumer.authorizationCodeCallback = function (strategy, req, options) {
+Oauth3Consumer.authorizationCodeCallback = function (strategy, req, options) {
   options = options || {};
   var self = strategy;
   var serverState = req.query.state;
@@ -458,13 +462,13 @@ OAuth3Consumer.authorizationCodeCallback = function (strategy, req, options) {
   return self._kv.getAsync(serverState).then(function (metaState) {
     var providerUri = metaState && metaState.providerUri;
 
-    return OAuth3Consumer.authenticateHelper(strategy, req, providerUri, options).then(function (helpers) {
+    return Oauth3Consumer.authenticateHelper(strategy, req, providerUri, options).then(function (helpers) {
       return exchangeCodeForToken(strategy, req, helpers.oauth2, helpers.callbackUrl, options);
     });
   });
 };
 
-OAuth3Consumer.authenticateHelper = function (self, req, providerUri, options) {
+Oauth3Consumer.authenticateHelper = function (self, req, providerUri, options) {
   var err;
 
   if (!providerUri) {
@@ -477,7 +481,7 @@ OAuth3Consumer.authenticateHelper = function (self, req, providerUri, options) {
     providerUri = 'https://' + providerUri;
   }
 
-  return getOauthClient(self, req, providerUri).then(function (info) {
+  return Oauth3Consumer._getOauthClient(self, req, providerUri).then(function (info) {
     options = options || {};
     var err;
     var url = require('url');
