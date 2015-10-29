@@ -1,8 +1,8 @@
 {
-  "name": "passport-oauth3",
-  "version": "1.0.5",
+  "name": "express-oauth3",
+  "version": "1.0.0",
   "description": "Node.js / ExpressJS / PassportJS Strategy for OAuth2 / OAuth3 providers",
-  "main": "strategy.js",
+  "main": "express-oauth3.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -21,19 +21,18 @@
   ],
   "author": {
     "name": "AJ ONeal",
-    "email": "coolaj86@gmail.com",
+    "email": "aj@daplie.com",
     "url": "https://coolaj86.com/"
   },
   "license": "Commercial",
   "bugs": {
-    "url": "https://github.com/OAuth3/passport-oauth3/issues"
+    "url": "https://github.com/OAuth3/express-oauth3/issues"
   },
-  "homepage": "https://github.com/OAuth3/passport-oauth3",
+  "homepage": "https://github.com/OAuth3/express-oauth3",
   "dependencies": {
-    "bluebird": "^2.9.21",
+    "bluebird": "^3.0.2",
     "oauth": "^0.9.12",
     "passport-oauth": "~1.0.0",
-    "request": "^2.44.0",
-    "uid2": "0.0.3"
+    "request": "^2.44.0"
   }
 }
