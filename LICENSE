@@ -3,3 +3,9 @@ This material and related specifications, copyrights, trademarks, and patents ar
 See https://github.com/OAuth3/TRON-LICENSE
 
 In essense, to use this copyrighted, trademarked, and or patented material you must agree to fight for the users.
+
+Exceptions:
+
+  * https://github.com/jaredhanson/passport-oauth2/blob/master/LICENSE
+  * ./lib/util.js
+  * ./errors/*.js

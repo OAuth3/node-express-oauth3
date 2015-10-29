@@ -1,9 +1,9 @@
 'use strict';
 
 var Oauth3 = module.exports = {
-  Consumer: require('./consumer')
-, Routes: require('./routes')
-, Router: require('./router')
+  Consumer: require('./lib/consumer')
+, Routes: require('./lib/routes')
+, Router: require('./lib/router')
 , create: function (app, DirectiveStore, KeyValueStore, options) {
     options = options || {};
 
@@ -14,7 +14,7 @@ var Oauth3 = module.exports = {
     options.authorizationCodeCallbackUrl = options.domain + options.authorizationCodeCallback;
 
     var consumer = options.consumer || Oauth3.Consumer.create(DirectiveStore, KeyValueStore, options);
-    var routes = options.routes || require('./routes').create(Oauth3.Consumer, consumer, options);
+    var routes = options.routes || Oauth3.Routes.create(Oauth3.Consumer, consumer, options);
 
     if ('string' !== typeof options.authorizationRedirect || !/^\/\w/.test(options.authorizationRedirect)) {
       throw new Error(
@@ -25,6 +25,6 @@ var Oauth3 = module.exports = {
       );
     }
 
-    require('./router').create(app, routes, options);
+    Oauth3.Router.create(app, routes, options);
   }
 };

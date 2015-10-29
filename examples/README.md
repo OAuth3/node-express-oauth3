@@ -1,1 +1,1 @@
-See [Passport OAuth3 Example](https://github.com/OAuth3/passport-oauth3-example)
+See [Express OAuth3 Example](https://github.com/OAuth3/express-oauth3-example)
