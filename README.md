@@ -37,11 +37,11 @@ var PromiseA = require('bluebird').Promise;
 // For sites that don't support OAuth3 automatic registration
 // you can provide the pre-registered OAuth2 client id and secret here
 var providerConfig = {
-  'example.org': {
+  'example.com:example.org': {
     id: 'my-app-id'
   , secret: 'my-app-secret'
   }
-, 'facebook.com': {
+, 'example.com:facebook.com': {
     id: 'other-app-id'
   , secret: 'other-app-secret'
   , "directives": {
@@ -66,8 +66,8 @@ var providerConfig = {
 };
 
 var DirectiveStore = {
-  getAsync:  function (providerUri) { return PromiseA.resolve(providerConfig[providerUri]); }
-, setAsync: function (providerUri, registration) { providerConfig[providerUri] = registration; return PromiseA.resolve(); }
+  getAsync:  function (hostname, providerUri) { return PromiseA.resolve(providerConfig[hostname + ':' + providerUri]); }
+, setAsync: function (hostname, providerUri, registration) { providerConfig[hostname + ':' + providerUri] = registration; return PromiseA.resolve(); }
 , pruneAsync: function () { /* remove expired and stale */ }
 };
 var TempStore = {
