@@ -7,9 +7,10 @@ var Oauth3 = module.exports = {
 , create: function (app, DirectiveStore, KeyValueStore, options) {
     options = options || {};
 
-    options.oauth3Prefix = options.oauth3Prefix || '/api/oauth3';
-    options.authorizationRedirect = options.authorizationRedirect || '/api/oauth3/authorization_redirect';
-    options.authorizationCodeCallback = options.authorizationCodeCallback || '/api/oauth3/authorization_code_callback';
+    options.oauth3Prefix = options.oauth3Prefix || '/api/org.oauth3.consumer';
+    options.oauth3PrefixInternal = options.oauth3PrefixInternal || '/api/org.oauth3.consumer';
+    options.authorizationRedirect = options.authorizationRedirect || '/api/org.oauth3.consumer/authorization_redirect';
+    options.authorizationCodeCallback = options.authorizationCodeCallback || '/api/org.oauth3.consumer/authorization_code_callback';
 
     if (options.domain && !options.authorizationCodeCallbackUrl) {
       options.authorizationCodeCallbackUrl = options.domain + options.authorizationCodeCallback;

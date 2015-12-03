@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Node.js / ExpressJS / PassportJS Strategy for OAuth2 / OAuth3 providers",
   "main": "express-oauth3.js",
+  "walnut": "walnut.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

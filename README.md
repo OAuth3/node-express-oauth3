@@ -158,3 +158,10 @@ var 'https://provider-fronteend.com/oauth3.json'
 
 'authn_scope' defines the least possible scope required to authenticate
 and get 'app_scoped_id'. 
+
+License
+=======
+
+(MIT OR Apache-2.0)
+
+See LICENSE

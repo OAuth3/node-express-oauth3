@@ -14,6 +14,8 @@ Possible attack vectors:
 * POST malformed data to `/api/oauth3/authorization_redirect`?
 * GET/POST malformed data to `/api/oauth3/authorization_code_callback`?
 * automatic registration could be invoked to gather developer emails or urls (an attacker visits logs into their own server from many sites, causing registration)
+* What could a malicous provider do? (bad sigs, messing with query params)
+* I believe redirect attacks are mitigated, but needs a twice-over
 
 Non-issues
 
