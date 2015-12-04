@@ -105,9 +105,9 @@ module.exports.create = function (conf, deps, app) {
       // TODO perform login and attack acs to this session token
       // see org.oauth3.provider/oauthclient-microservice/lib/oauth3orize.js
       var tok = jwt.sign({
-        accessToken: data.accessToken
+        accessToken: data.params.access_token
       , consumer: appname // aud?
-      , refreshToken: data.refreshToken
+      , refreshToken: data.params.refresh_token
       , providerUri: data.providerUri
       , params: data.params // expirey?
       , iat: issuedAt
