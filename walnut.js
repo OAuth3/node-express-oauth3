@@ -3,9 +3,11 @@
 var PromiseA = require('bluebird').Promise;
 
 module.exports.create = function (conf, deps, app) {
+  var jwt = PromiseA.promisifyAll(require('jsonwebtoken'));
   var kvStore = deps.memstore;
   var OAuth3 = require('./express-oauth3');
   var DirectiveStore;
+  var TokenSigner;
 
   var options;
 
@@ -74,6 +76,48 @@ module.exports.create = function (conf, deps, app) {
     }
   };
 
+  TokenSigner = {
+    // The purpose of this is essentially to establish a session
+    signAsync: function (data) {
+      // "https://facebook.com:765/yoyoy/?#"
+      var abnormalHostname = (data.referer || '');
+      var abnormalHostname2 = (data.host || '');
+      var appname = abnormalHostname.replace(/(https?:\/\/)?([^:\/]+)(:\d+)?(\/[^#\?]+)?.*/, '$2$4').replace(/\/$/, '');
+      var appname2 = abnormalHostname2.replace(/(https?:\/\/)?([^:\/]+)(:\d+)?(\/[^#\?]+)?.*/, '$2$4').replace(/\/$/, '');
+      var issuedAt = Math.floor(Date.now() / 1000);
+      var privkey;
+      // we probably want to drop the port and any trailing junk after the last '/'
+
+      if (conf.keys[appname]) {
+        privkey = conf.keys[appname].privkey;
+      } else {
+        if (conf.keys[appname2]) {
+          privkey = conf.keys[appname2].privkey;
+        } else {
+          return PromiseA.reject({
+            message: "'" + appname + "' is not configured for signing with a private key"
+          , code: "E_NO_PRIVATE_KEY"
+          });
+        }
+      }
+
+      // NOTE data.scope is available for reference
+      // TODO perform login and attack acs to this session token
+      // see org.oauth3.provider/oauthclient-microservice/lib/oauth3orize.js
+      var tok = jwt.sign({
+        accessToken: data.accessToken
+      , consumer: appname // aud?
+      , refreshToken: data.refreshToken
+      , providerUri: data.providerUri
+      , params: data.params // expirey?
+      , iat: issuedAt
+      //, exp: ''
+      }, privkey, { algorithm: 'RS256' });
+
+      return PromiseA.resolve(tok);
+    }
+  };
+
   options = {
     // walnut handles '/api/org.oauth3.consumer' as '/'
     // but will also offer it as '/api' and '/api/org.oauth3.consumer'
@@ -87,5 +131,5 @@ module.exports.create = function (conf, deps, app) {
   //, authorizationCodeCallbackUrl: /*options.domain +*/ '{{host}}/api/org.oauth3.consumer/authorization_code_callback'
   };
 
-  OAuth3.create(app, DirectiveStore, kvStore, options);
+  OAuth3.create(app, TokenSigner, DirectiveStore, kvStore, options);
 };
