@@ -83,6 +83,7 @@ module.exports.create = function (conf, deps, app) {
       // https://tools.ietf.org/html/rfc6749#section-4.2.2
       /* params = { access_token, refresh_token, scope, state, token_type, expires_in, expires_at, expires (in) } */
 
+      var request = PromiseA.promisifyAll(require('request'));
       var crypto = require('crypto');
       // "https://facebook.com:765/yoyoy/?#" -> facebook.com/yoyoy
       var re = /(https?:\/\/)?([^:\/]+)(:\d+)?(\/[^#\?]+)?.*/;
@@ -95,52 +96,157 @@ module.exports.create = function (conf, deps, app) {
       var expiresAt = Math.floor(new Date(Date.now() + (expiresIn * 1000)).valueOf() / 1000);
       var privkey;
       var issuer;
+      var pub;
+      var providerUri = meta.providerUri.replace(/\//g, ':');
 
-      if (conf.keys[appname]) {
-        privkey = conf.keys[appname].privkey;
-        issuer = appname;
-      } else {
-        if (conf.keys[appname2]) {
-          privkey = conf.keys[appname2].privkey;
-          issuer = appname2;
-        } else {
+      function getProfileUrl(resp) {
+        var json = (resp.body || resp.data);
+
+        console.log('resp.body', typeof resp.body);
+        console.log('resp.data', typeof resp.data);
+        if ('string' === typeof json) {
+          json = JSON.parse(json);
+        }
+
+        if (!(json.profile || json.accounts))) {
           return PromiseA.reject({
-            message: "neither '" + appname + "' nor '" + appname + "' is configured for signing with a private key"
-          , code: "E_NO_PRIVATE_KEY"
+            message: "no profile url"
+          , code: "E_NO_OAUTH3_ACCOUNTS"
           });
         }
+
+        return (json.profile || json.accounts);
       }
 
-      // TODO perform login and attack acs to this session token
+      return request.getAsync('https://' + providerUri + '/oauth3.json').then(getProfileUrl, function (/*err*/) {
+        // TODO needs reporting API -> /api/com.oauth3.providers/ + providerUri + /oauth3.json
+        var url = 'https://oauth3.org/providers/' + providerUri + '/oauth3.json';
 
-      // https://tools.ietf.org/html/draft-ietf-oauth-json-web-token-32#section-4.1
-      // https://openid.net/specs/draft-jones-json-web-token-07.html
-      // see org.oauth3.provider/oauthclient-microservice/lib/oauth3orize.js
-      /* jwt = { jti, iss, aud, sub, typ, iat, exp, data } */
-      var accessToken = jwt.sign({
-        jti: crypto.randomBytes(16).toString('hex') // prevent replays
-      , iss: issuer               // the audience must trust the public keys of the issuer
-      , aud: audience             // the issuer may have multiple audiences and therefore must specify (for the audience's sake)
-      //, prn: meta.providerUri     // https://openid.net/specs/draft-jones-json-web-token-07.html
-      , sub: meta.providerUri     // rfc7519 for prn - the subject (principle) - in this case is the 3rd party login
-      , typ: 'credentials'        // how to know what
-      , iat: issuedAt             // IntDate
-      , exp: expiresAt            // IntDate
-      , data: params              // non-spec, application specific
-      }, privkey, { algorithm: 'RS256' });
+        return request.getAsync(url).then(getProfileUrl, function (/*err*/) {
+          var url = 'https://raw.githubusercontent.com/OAuth3/providers/master/' + providerUri + '.json';
 
-      // https://tools.ietf.org/html/rfc6749#section-4.2.2
-      return PromiseA.resolve({
-      // The access token should have a lot of data (prevent db lookups)
-        access_token: accessToken
-      // The refresh token will require a database lookup (and check if the user is still allowed - PCI/SOX compliance)
-      , refresh_token: '' // refreshToken
-      // expires_at refers to accessToken, but since it's jwt
-      , expires_at: expiresAt
-      , expires_in: expiresIn
-        // TODO declare what is granted with this token
-      , scope: undefined
-      , token_type: 'bearer'
+          return request.getAsync({
+            method: 'GET'
+          , url: url
+          , headers: {
+              'Authorization': 'Bearer ' + params.access_token
+            }
+          });
+        });
+      }).then(function (profileUrl) {
+
+        return request.getAsync(profileUrl).then(function (resp) {
+          console.log('resp.body', typeof resp.body);
+          console.log('resp.data', typeof resp.data);
+
+          var json = (resp.body || resp.data);
+          if ('string' === typeof json) {
+            json = JSON.parse(json);
+          }
+          json = json.accounts || json.profile || json;
+
+          if (Array.isArray(json)) {
+            return json;
+          }
+
+          if (json.appScopedId || json.idx || json.id) {
+            return [json];
+          }
+
+          // TODO need a way to specify where to grab oauth3.json in request
+          return PromiseA.reject({
+            message: "'" + meta.providerUri + "' did not provide an id"
+          , code: "E_NO_IDS"
+          });
+        });
+      }).then(function (profiles) {
+
+        // TODO need a way to describe app-scoped vs non-app-scoped ids
+        // the accounts of one provider become ids for a consumer
+        var ids = profiles.map(function (profile) {
+          return profile.appScopedId || profile.idx || profile.id || profile;
+        }).filter(function (p) { return p; });
+        var emails = profiles.reduce(function (arr, profile) {
+          if (profile.email) {
+            arr.push(profile.email);
+          }
+          if (Array.isArray(profile.emails)) {
+            profile.emails.forEach(function (email) {
+              arr.push(email);
+            });
+          }
+          return arr;
+        }, []);
+        var usernames = profiles.reduce(function (arr, profile) {
+          if (profile.username) {
+            arr.push(profile.username);
+          }
+          if (Array.isArray(profile.usernames)) {
+            profile.usernames.forEach(function (username) {
+              arr.push(username);
+            });
+          }
+          return arr;
+        }, []);
+
+
+        if (conf.keys[appname]) {
+          privkey = conf.keys[appname].privkey;
+          issuer = appname;
+          pub = conf.keys[appname].pubkey;
+        } else {
+          if (conf.keys[appname2]) {
+            privkey = conf.keys[appname2].privkey;
+            issuer = appname2;
+            pub = conf.keys[appname2].pubkey;
+          } else {
+            return PromiseA.reject({
+              message: "neither '" + appname + "' nor '" + appname2 + "' is configured for signing with a private key"
+            , code: "E_NO_PRIVATE_KEY"
+            });
+          }
+        }
+
+        // TODO
+        // needs login identifier (grab from facebook, etc?)
+        // needs account identifiers array (usually of one)
+
+        // https://tools.ietf.org/html/draft-ietf-oauth-json-web-token-32#section-4.1
+        // https://openid.net/specs/draft-jones-json-web-token-07.html
+        // see org.oauth3.provider/oauthclient-microservice/lib/oauth3orize.js
+        /* jwt = { jti, iss, aud, sub, typ, iat, exp, data } */
+        var accessToken = jwt.sign({
+          jti: crypto.randomBytes(16).toString('hex') // prevent replays
+        , iss: issuer               // the audience must trust the public keys of the issuer
+        , aud: audience             // the issuer may have multiple audiences and therefore must specify (for the audience's sake)
+        //, prn: meta.providerUri     // https://openid.net/specs/draft-jones-json-web-token-07.html
+        , sub: meta.providerUri     // rfc7519 for prn - the subject (principle) - in this case is the 3rd party login
+        , typ: 'credentials'        // how to know what
+        , iat: issuedAt             // IntDate
+        , exp: expiresAt            // IntDate
+        , data: params              // non-spec, application specific
+        , pub: pub                  // non-spec TODO use a fingerprint of the keypair rather than the full public key pem
+
+                                    // hmm... I'd really like to only have one id
+        , ids: ids                  // non-spec TODO how can we know the ids are app-scoped?
+        , emails: emails
+        , usernames: usernames
+        //, ixs: ixs                  // non-spec
+        }, privkey, { algorithm: 'RS256' });
+
+        // https://tools.ietf.org/html/rfc6749#section-4.2.2
+        return {
+        // The access token should have a lot of data (prevent db lookups)
+          access_token: accessToken
+        // The refresh token will require a database lookup (and check if the user is still allowed - PCI/SOX compliance)
+        , refresh_token: '' // refreshToken
+        // expires_at refers to accessToken, but since it's jwt
+        , expires_at: expiresAt
+        , expires_in: expiresIn
+          // TODO declare what is granted with this token
+        , scope: undefined
+        , token_type: 'bearer'
+        };
       });
     }
   };
