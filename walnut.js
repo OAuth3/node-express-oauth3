@@ -212,18 +212,19 @@ module.exports.create = function (conf, deps, app) {
         // needs account identifiers array (usually of one)
 
         // https://tools.ietf.org/html/draft-ietf-oauth-json-web-token-32#section-4.1
-        // https://openid.net/specs/draft-jones-json-web-token-07.html
+        // https://openid.net/specs/draft-jones-json-web-token-07.html (prn became sub)
         // see org.oauth3.provider/oauthclient-microservice/lib/oauth3orize.js
         /* jwt = { jti, iss, aud, sub, typ, iat, exp, data } */
         var accessToken = jwt.sign({
           jti: crypto.randomBytes(16).toString('hex') // prevent replays
-        , iss: issuer               // the audience must trust the public keys of the issuer
-        , aud: audience             // the issuer may have multiple audiences and therefore must specify (for the audience's sake)
-        //, prn: meta.providerUri     // https://openid.net/specs/draft-jones-json-web-token-07.html
-        , sub: meta.providerUri     // rfc7519 for prn - the subject (principle) - in this case is the 3rd party login
-        , typ: 'credentials'        // how to know what
         , iat: issuedAt             // IntDate
         , exp: expiresAt            // IntDate
+
+        , iss: issuer               // the audience must trust the public keys of the issuer
+        , aud: audience             // the issuer may have multiple audiences and therefore must specify (for the audience's sake)
+        , sub: meta.providerUri     // rfc7519 for prn - the subject (principle) - in this case is the 3rd party login
+        , typ: 'credentials'        // how to know what
+
         , data: params              // non-spec, application specific
         , pub: pub                  // non-spec TODO use a fingerprint of the keypair rather than the full public key pem
 
