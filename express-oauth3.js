@@ -28,6 +28,6 @@ var Oauth3 = module.exports = {
       );
     }
 
-    Oauth3.Router.create(app, routes, options);
+    return Oauth3.Router.create(app, routes, options);
   }
 };
