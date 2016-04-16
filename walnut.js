@@ -6,7 +6,7 @@ module.exports.create = function (xconfx, deps, app) {
   // DirectiveStore is directive + registration
   // TODO add keys
   var things = require('./lib/stores-abstract').create(xconfx, require('./lib/request-oauth3').getAsync);
-  var DirectiveStore = require('./lib/directive-store').create(things.DirStore, things.RegStore);
+  var DirectiveStore = require('./lib/directive-store').create(things.DirStore, things.RegStore, things.KeyStore);
   var TokenSigner = require('./lib/token-signer').create(things.DirStore, things.KeyStore);
 
   var options = {
