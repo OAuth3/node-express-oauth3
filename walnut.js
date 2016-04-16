@@ -24,5 +24,5 @@ module.exports.create = function (xconfx, deps, app) {
 
   // TODO clean-up, maybe 'things' should be passed in ?
 
-  return OAuth3.create(xconfx, app, TokenSigner, DirectiveStore, kvStore, options);
+  return OAuth3.create(app, TokenSigner, DirectiveStore, kvStore, options);
 };
