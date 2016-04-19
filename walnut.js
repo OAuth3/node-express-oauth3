@@ -3,10 +3,10 @@
 module.exports.create = function (xconfx, deps, app) {
   var kvStore = deps.memstore;
   var OAuth3 = require('./express-oauth3');
-  // DirectiveStore is directive + registration
+  // ConfigStore is directive + registration
   // TODO add keys
   var things = require('./lib/stores-abstract').create(xconfx, require('./lib/request-oauth3').getAsync);
-  var DirectiveStore = require('./lib/directive-store').create(things.DirStore, things.RegStore, things.KeyStore);
+  var ConfigStore = require('./lib/config-store').create(things.DirStore, things.RegStore, things.KeyStore);
   var TokenSigner = require('./lib/token-signer').create(things.DirStore, things.KeyStore);
 
   var options = {
@@ -24,5 +24,5 @@ module.exports.create = function (xconfx, deps, app) {
 
   // TODO clean-up, maybe 'things' should be passed in ?
 
-  return OAuth3.create(app, TokenSigner, DirectiveStore, kvStore, options);
+  return OAuth3.create(app, TokenSigner, ConfigStore, kvStore, options);
 };
