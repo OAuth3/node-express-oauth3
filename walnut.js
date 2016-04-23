@@ -5,9 +5,9 @@ module.exports.create = function (xconfx, deps, app) {
   var OAuth3 = require('./express-oauth3');
   // ConfigStore is directive + registration
   // TODO add keys
-  var things = require('./lib/stores-abstract').create(xconfx, require('./lib/request-oauth3').getAsync);
-  var ConfigStore = require('./lib/config-store').create(things.DirStore, things.RegStore, things.KeyStore);
-  var TokenSigner = require('./lib/token-signer').create(things.DirStore, things.KeyStore);
+  var stores = require('./lib/stores-abstract').create(xconfx, require('./lib/request-oauth3').getAsync);
+  var ConfigStore = require('./lib/config-store').create(stores.DirStore, stores.RegStore, stores.KeyStore);
+  var TokenSigner = require('./lib/token-signer').create(stores.DirStore, stores.KeyStore);
 
   var options = {
     // walnut handles '/api/org.oauth3.consumer' as '/'
@@ -18,11 +18,12 @@ module.exports.create = function (xconfx, deps, app) {
   , oauth3PrefixInternal: '/api/org.oauth3.consumer'
   , authorizationRedirect: '/api/org.oauth3.consumer/authorization_redirect'
   , authorizationCodeCallback: '/api/org.oauth3.consumer/authorization_code_callback'
+  , jwks: '/api/org.oauth3.consumer/jwks'
     // TODO double check that this will template the current host at runtime
   //, authorizationCodeCallbackUrl: /*options.domain +*/ '{{host}}/api/org.oauth3.consumer/authorization_code_callback'
   };
 
-  // TODO clean-up, maybe 'things' should be passed in ?
+  // TODO clean-up, maybe 'stores' should be passed in ?
 
-  return OAuth3.create(app, TokenSigner, ConfigStore, kvStore, options);
+  return OAuth3.create(app, TokenSigner, ConfigStore, stores.KeyStore, kvStore, options);
 };
